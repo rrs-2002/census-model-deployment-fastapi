@@ -1,83 +1,154 @@
-Working in a command line environment is recommended for ease of use with git and dvc. If on Windows, WSL1 or 2 is recommended.
+# Census Income Prediction — ML Model Deployment with FastAPI
 
-# Environment Set up
-* **Option 1: Using pip and venv (Recommended)**
-    * Ensure you have Python 3.13 installed
-    * Create virtual environment: `python3.13 -m venv .venv`
-    * Activate environment: `source .venv/bin/activate` (On Windows: `.venv\Scripts\activate`)
-    * Install dependencies: `pip install -r requirements.txt`
+**GitHub Repository:** https://github.com/rrs-2002/census-model-deployment-fastapi
 
-* **Option 2: Using conda**
-    * Download and install conda if you don't have it already.
-    * conda create -n [envname] "python=3.13" scikit-learn dvc pandas numpy pytest jupyter jupyterlab fastapi uvicorn pydantic httpx matplotlib seaborn -c conda-forge
-    * Install git either through conda ("conda install git") or through your CLI, e.g. sudo apt-get git.
+A machine learning classification model trained on [UCI Census Income Data](https://archive.ics.uci.edu/ml/datasets/census+income) to predict whether an individual's annual income exceeds $50K. The model is deployed as a REST API using **FastAPI** with full CI/CD via **GitHub Actions** and **Render**.
 
-## Repositories
+---
 
-* Create a directory for the project and initialize Git and DVC.
-   * As you work on the code, continually commit changes. Trained models you want to keep must be committed to DVC.
-* Connect your local Git repository to GitHub.
+## Project Structure
 
-## Set up S3
+```
+.
+├── .flake8                        # Flake8 linting configuration
+├── .github/
+│   └── workflows/
+│       └── main.yml               # GitHub Actions CI pipeline (pytest + flake8)
+├── .gitignore
+├── data/
+│   └── census.csv                 # Cleaned UCI Census Income dataset
+├── model/
+│   ├── trained_model.pkl          # Trained RandomForestClassifier
+│   ├── encoder.pkl                # Fitted OneHotEncoder
+│   └── lb.pkl                     # Fitted LabelBinarizer
+├── screenshots/
+│   ├── continuous_integration.png # GitHub Actions CI passing
+│   ├── continuous_deployment.png  # Render auto-deploy setting
+│   ├── example.png                # FastAPI docs with example payload
+│   ├── live_get.png               # Browser hitting live root endpoint
+│   └── live_post.png              # Terminal output from live_post.py
+├── starter/
+│   ├── __init__.py
+│   ├── train_model.py             # Training pipeline script
+│   └── ml/
+│       ├── __init__.py
+│       ├── data.py                # Data processing (process_data function)
+│       ├── model.py               # ML model functions (train, inference, metrics)
+│       ├── slice_performance.py   # Compute metrics on data slices
+│       └── test_model.py          # Unit tests for ML functions (3 tests)
+├── main.py                        # FastAPI application (GET / and POST /predict)
+├── test_api.py                    # API tests (1 GET + 2 POST tests)
+├── live_post.py                   # Script to query the live deployed API
+├── slice_output.txt               # Model performance on categorical feature slices
+├── model_card_template.md         # Model Card documentation
+├── requirements.txt               # Python dependencies
+├── setup.py                       # Package setup
+├── sanitycheck.py                 # Provided script to validate API test cases
+├── dvc_on_heroku_instructions.md  # Reference: DVC on Heroku (not used)
+└── README.md                      # This file
+```
 
-* In your CLI environment install the<a href="https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html" target="_blank"> AWS CLI tool</a>.
-* In the navigation bar in the Udacity classroom select **Open AWS Gateway** and then click **Open AWS Console**. You will not need the AWS Access Key ID or Secret Access Key provided here.
-* From the Services drop down select S3 and then click Create bucket.
-* Give your bucket a name, the rest of the options can remain at their default.
+---
 
-To use your new S3 bucket from the AWS CLI you will need to create an IAM user with the appropriate permissions. The full instructions can be found <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html#id_users_create_console" target="_blank">here</a>, what follows is a paraphrasing:
+## Environment Setup
 
-* Sign in to the IAM console <a href="https://console.aws.amazon.com/iam/" target="_blank">here</a> or from the Services drop down on the upper navigation bar.
-* In the left navigation bar select **Users**, then choose **Add user**.
-* Give the user a name and select **Programmatic access**.
-* In the permissions selector, search for S3 and give it **AmazonS3FullAccess**
-* Tags are optional and can be skipped.
-* After reviewing your choices, click create user. 
-* Configure your AWS CLI to use the Access key ID and Secret Access key.
+- **Python:** 3.12
+- **Environment Manager:** Conda (`ml-core` environment)
 
-## GitHub Actions
+```bash
+conda activate ml-core
+pip install -r requirements.txt
+```
 
-* Setup GitHub Actions on your repository. You can use one of the pre-made GitHub Actions if at a minimum it runs pytest and flake8 on push and requires both to pass without error.
-   * Make sure you set up the GitHub Action to use Python 3.13 (same version as development).
-   * Note: Add flake8 to requirements.txt if you want to use it for linting: `pip install flake8`
-* Add your <a href="https://github.com/marketplace/actions/configure-aws-credentials-action-for-github-actions" target="_blank">AWS credentials to the Action</a>.
-* Set up <a href="https://github.com/iterative/setup-dvc" target="_blank">DVC in the action</a> and specify a command to `dvc pull`.
-
-## Data
-
-* Download census.csv from the data folder in the starter repository.
-   * Information on the dataset can be found <a href="https://archive.ics.uci.edu/ml/datasets/census+income" target="_blank">here</a>.
-* Create a remote DVC remote pointing to your S3 bucket and commit the data.
-* This data is messy, try to open it in pandas and see what you get.
-* To clean it, use your favorite text editor to remove all spaces.
-* Commit this modified data to DVC under a new name (we often want to keep the raw data untouched but then can keep updating the cooked version).
+---
 
 ## Model
 
-* Using the starter code, write a machine learning model that trains on the clean data and saves the model. Complete any function that has been started.
-* Write unit tests for at least 3 functions in the model code.
-* Write a function that outputs the performance of the model on slices of the data.
-   * Suggestion: for simplicity, the function can just output the performance on slices of just the categorical features.
-* Write a model card using the provided template.
+- **Algorithm:** Random Forest Classifier (scikit-learn)
+- **Hyperparameters:** `n_estimators=100`, `random_state=42`
+- **Task:** Binary classification — predict `<=50K` or `>50K` salary
+- **Data:** UCI Census Income Dataset (~32,561 rows, 14 features)
+- **Train/Test Split:** 80/20
 
-## API Creation
+### Training
 
-* Create a RESTful API using FastAPI this must implement:
-   * GET on the root giving a welcome message.
-   * POST that does model inference.
-   * Type hinting must be used.
-   * Use a Pydantic model to ingest the body from POST. This model should contain an example.
-    * Hint: the data has names with hyphens and Python does not allow those as variable names. Do not modify the column names in the csv and instead use the functionality of FastAPI/Pydantic/etc to deal with this.
-* Write 3 unit tests to test the API (one for the GET and two for POST, one that tests each prediction).
+```bash
+python -m starter.train_model
+```
 
-## API Deployment
+### Slice Performance
 
-* Create a free Heroku account (for the next steps you can either use the web GUI or download the Heroku CLI).
-* Create a new app and have it deployed from your GitHub repository.
-   * Enable automatic deployments that only deploy if your continuous integration passes.
-   * Hint: think about how paths will differ in your local environment vs. on Heroku.
-   * Hint: development in Python is fast! But how fast you can iterate slows down if you rely on your CI/CD to fail before fixing an issue. I like to run flake8 locally before I commit changes.
-   * Note: Install flake8 separately if needed: `pip install flake8`
-* Set up DVC on Heroku using the instructions contained in the starter directory.
-* Set up access to AWS on Heroku, if using the CLI: `heroku config:set AWS_ACCESS_KEY_ID=xxx AWS_SECRET_ACCESS_KEY=yyy`
-* Write a script that uses the requests module to do one POST on your live API.
+```bash
+python -m starter.ml.slice_performance
+```
+
+Output is saved to `slice_output.txt`.
+
+---
+
+## API
+
+Built with **FastAPI**. Provides two endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/`      | Returns a welcome message |
+| POST   | `/predict` | Accepts census data as JSON, returns income prediction |
+
+### Run Locally
+
+```bash
+uvicorn main:app --reload
+```
+
+Then visit `http://127.0.0.1:8000/docs` for the interactive Swagger UI.
+
+### Live API
+
+Deployed on **Render**: https://census-income-api-xang.onrender.com
+
+```bash
+python live_post.py
+```
+
+---
+
+## Testing
+
+6 total tests (3 ML + 3 API):
+
+```bash
+# Run all tests
+pytest -v
+
+# Run only ML tests
+pytest starter/ml/test_model.py -v
+
+# Run only API tests
+pytest test_api.py -v
+
+# Lint check
+flake8 .
+
+# Sanity check for API tests
+python sanitycheck.py
+```
+
+---
+
+## CI/CD
+
+- **CI:** GitHub Actions runs `pytest` and `flake8` on every push to `main`.
+- **CD:** Render auto-deploys after CI checks pass.
+
+---
+
+## Screenshots
+
+| Screenshot | Description |
+|---|---|
+| `screenshots/continuous_integration.png` | GitHub Actions CI passing |
+| `screenshots/continuous_deployment.png` | Render auto-deploy enabled |
+| `screenshots/example.png` | FastAPI docs with example payload |
+| `screenshots/live_get.png` | Browser GET on live root endpoint |
+| `screenshots/live_post.png` | Terminal output from live POST |
