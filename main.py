@@ -6,6 +6,8 @@ import pickle
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from starter.ml.data import process_data
+from starter.ml.model import inference
 
 # Load model artifacts at startup
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "model")
@@ -16,10 +18,6 @@ with open(os.path.join(MODEL_DIR, "encoder.pkl"), "rb") as f:
     encoder = pickle.load(f)
 with open(os.path.join(MODEL_DIR, "lb.pkl"), "rb") as f:
     lb = pickle.load(f)
-
-# Import the processing functions
-from starter.ml.data import process_data
-from starter.ml.model import inference
 
 app = FastAPI(
     title="Census Income Prediction API",

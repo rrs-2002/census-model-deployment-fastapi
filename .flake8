@@ -1,0 +1,11 @@
+[flake8]
+max-line-length = 127
+exclude =
+    sanitycheck.py,
+    .git,
+    __pycache__,
+    .venv,
+    venv
+per-file-ignores =
+    starter/__init__.py:W391
+    starter/ml/__init__.py:W391
