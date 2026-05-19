@@ -118,8 +118,12 @@ dmypy.json
 *.weights
 
 # Data files (but keep small sample data)
+# Ignore all csv files
 *.csv
-!starter/data/census.csv  # Keep the census dataset
+
+# But keep this specific dataset
+!data/
+!data/census.csv
 
 # Large data directories
 data/large/
