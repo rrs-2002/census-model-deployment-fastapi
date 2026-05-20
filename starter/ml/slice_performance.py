@@ -4,6 +4,7 @@ Compute model performance on slices of categorical features.
 import pandas as pd
 import pickle
 import os
+from sklearn.model_selection import train_test_split
 
 from starter.ml.data import process_data
 from starter.ml.model import inference, compute_model_metrics
@@ -36,6 +37,9 @@ def compute_slice_metrics(data, cat_features, model, encoder, lb):
             # Filter data for this slice
             slice_data = data[data[feature] == value]
 
+            if len(slice_data) == 0:
+                continue
+
             X_slice, y_slice, _, _ = process_data(
                 slice_data,
                 categorical_features=cat_features,
@@ -64,6 +68,9 @@ if __name__ == "__main__":
     base_dir = os.path.join(os.path.dirname(__file__), '..', '..')
     data = pd.read_csv(os.path.join(base_dir, 'data', 'census.csv'))
 
+    # Split to get the same test split as train_model.py
+    _, test_data = train_test_split(data, test_size=0.20, random_state=42)
+
     # Load saved model artifacts
     model_dir = os.path.join(base_dir, 'model')
     with open(os.path.join(model_dir, 'trained_model.pkl'), 'rb') as f:
@@ -78,7 +85,7 @@ if __name__ == "__main__":
         "relationship", "race", "sex", "native-country",
     ]
 
-    results = compute_slice_metrics(data, cat_features, model, encoder, lb)
+    results = compute_slice_metrics(test_data, cat_features, model, encoder, lb)
 
     # Write to file
     output_path = os.path.join(base_dir, 'slice_output.txt')
@@ -88,3 +95,4 @@ if __name__ == "__main__":
             f.write(line + '\n')
 
     print(f"\nSlice metrics written to {output_path}")
+
